@@ -2,10 +2,10 @@ from django.urls import path, include
 from .views import Tasklist, TaskDetail,TaskCreate,TaskUpdate, TaskDelete , CustomLoginView ,RegisterPage 
 from django.contrib.auth.views import LogoutView
 from rest_framework.routers import DefaultRouter
-from .api_views import TaskViewSet, RegisterAPI, CustomObtainAuthToken
+from .api_views import Tasklist, RegisterPage, CustomLoginView
 
 router = DefaultRouter()
-router.register(r'api/tasks', TaskViewSet, basename='task')
+router.register(r'api/tasks', Tasklist, basename='task')
 urlpatterns = [
     path('login/',CustomLoginView.as_view() ,name='login'),
     path('logout/',LogoutView.as_view(next_page='login') ,name='logout'),
@@ -17,7 +17,7 @@ urlpatterns = [
     path('task-delete/<int:pk>',TaskDelete.as_view() ,name='task-delete'),
 
     # API URLs
-    path('api/register/', RegisterAPI.as_view(), name='api-register'),
-    path('api/token/', CustomObtainAuthToken.as_view(), name='api-token'),
+    path('api/register/', RegisterPage.as_view(), name='api-register'),
+    path('api/token/', CustomLoginView.as_view(), name='api-token'),
     path('', include(router.urls)),
 ]

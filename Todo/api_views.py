@@ -1,48 +1,78 @@
-from rest_framework import viewsets, permissions, status
-from rest_framework.response import Response
-from rest_framework.views import APIView
-from rest_framework.authtoken.models import Token
-from rest_framework.authtoken.views import ObtainAuthToken
-from rest_framework.decorators import action
-from django.contrib.auth.models import User
+from django.shortcuts import render,redirect
+from django.views.generic.list import ListView
+from django.views.generic.detail import DetailView
+from django.views.generic.edit import CreateView , UpdateView, DeleteView , FormView 
+from django.urls import reverse_lazy
+from django.contrib.auth.views import LoginView
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.forms import UserCreationForm
+from django.contrib.auth import login
 from .models import Task
-from .serializers import TodoSerializer, RegisterSerializer, UserSerializer
+# Create your views here.
 
-# تسجيل مستخدم جديد
-class RegisterAPI(APIView):
-    permission_classes = [permissions.AllowAny]
+class CustomLoginView(LoginView):
+   template_name = 'Todo/login.html'
+   fields = '__all__'
+   redirect_authenticated_user = True
 
+   def get_success_url(self):
+      return reverse_lazy('tasks')
 
-    def post(self, request):
-        serializer = RegisterSerializer(data=request.data)
-        if serializer.is_valid():
-            user = serializer.save()
-            token, created = Token.objects.get_or_create(user=user)
-            return Response({'user': UserSerializer(user).data, 'token': token.key}, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+class RegisterPage(FormView):
+   template_name = 'Todo/register.html'
+   form_class= UserCreationForm
+   redirect_authenticated_user = True
+   success_url = reverse_lazy('tasks')
 
-class CustomObtainAuthToken(ObtainAuthToken):
-    def post(self, request, *args, **kwargs):
-        response = super().post(request, *args, **kwargs)
-        token = response.data.get('token') if response.data else None
-        if not token:
-            return Response({'error': 'Invalid credentials or token not found.'}, status=status.HTTP_400_BAD_REQUEST)
-        user = Token.objects.get(key=token).user
-        return Response({'token': token, 'user': UserSerializer(user).data})
+   def form_valid(self, form):
+      user = form.save()
+      if user is not None:
+         login(self.request,user)
+      return super().form_valid(form)
 
-class TaskViewSet(viewsets.ModelViewSet):
-    serializer_class = TodoSerializer
-    permission_classes = [permissions.IsAuthenticated]
+   def get(self, *args,**kwargs):
+      if self.request.user.is_authenticated:
+         return redirect('tasks')
+      return super(RegisterPage,self).get(*args, **kwargs)   
 
-    def get_queryset(self):
-        return Task.objects.filter(owner=self.request.user)
+class Tasklist(LoginRequiredMixin,ListView):
+   model= Task
+   context_object_name= 'tasks'
 
-    def perform_create(self, serializer):
-        serializer.save(owner=self.request.user)
+   def get_context_data(self, **kwargs):
+      context = super().get_context_data(**kwargs)
+      context['tasks'] = context['tasks'].filter(owner=self.request.user)
+      context['count'] = context['tasks'].filter(complete=False).count()
+      search_input = self.request.GET.get('search-area') or ''
+      if search_input:
+         context['tasks'] = context['tasks'].filter(
+             title__istartswith = search_input )
 
-    @action(detail=True, methods=['post'])
-    def toggle_complete(self, request, pk=None):
-        task = self.get_object()
-        task.complete = not task.complete
-        task.save()
-        return Response(self.get_serializer(task).data)
+      context['search_input'] = search_input
+     
+      return context
+
+class TaskDetail(LoginRequiredMixin,DetailView):
+   model= Task   
+   context_object_name= 'task'
+   template_name='Todo/task.html'
+
+class TaskCreate(LoginRequiredMixin,CreateView):
+   model= Task  
+   fields= ['title','description', 'complete']
+   success_url = reverse_lazy('tasks') 
+
+   def form_valid(self, form):
+       form.instance.owner = self.request.user
+       return super(TaskCreate, self).form_valid(form)
+      
+
+class TaskUpdate(LoginRequiredMixin,UpdateView):
+   model= Task  
+   fields=['title','description', 'complete']
+   success_url = reverse_lazy('tasks') 
+
+class TaskDelete(LoginRequiredMixin,DeleteView):
+   model= Task  
+   context_object_name= 'task'
+   success_url = reverse_lazy('tasks')
