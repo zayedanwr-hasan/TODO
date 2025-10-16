@@ -34,9 +34,3 @@ API Endpoints
 - POST /api/token/     — obtain token
 - /api/tasks/          — authenticated CRUD for tasks
 
-Notes
-
-- `Task` model fields: `owner`, `title`, `description`, `status`, `priority`, `complete`, `created_at`, `updated_at`.
-- `owner` may be nullable to avoid migration issues with existing rows; you can make it non-null after handling data.
-
-If you want, I can also generate migrations after your local verification.
